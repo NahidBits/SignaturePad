@@ -1,0 +1,268 @@
+﻿@{
+    ViewData["Title"] = "Home Page";
+}
+
+<style>
+    :root {
+        --bg: #f5f7fb;
+        --canvas-bg: #fff;
+        --accent: #2b6cb0
+    }
+
+    * {
+        box-sizing: border-box
+    }
+
+    body {
+        font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        margin: 0;
+        background: var(--bg);
+        color: #222
+    }
+
+    .card {
+        width: 760px;
+        max-width: 96%;
+        background: linear-gradient(180deg,#ffffff 0%, #fbfdff 100%);
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 6px 18px rgba(23,33,56,0.08)
+    }
+
+    h1 {
+        font-size: 18px;
+        margin: 0 0 12px
+    }
+
+    .toolbar {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        margin-bottom: 12px
+    }
+
+        .toolbar > * {
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(15,23,42,0.06);
+            background: #fff
+        }
+
+    button {
+        cursor: pointer
+    }
+
+    .btn-primary {
+        background: var(--accent);
+        color: #fff;
+        border: none
+    }
+
+    .btn-danger {
+        background: #e53e3e;
+        color: #fff;
+        border: none
+    }
+
+    .controls {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        margin-left: auto
+    }
+
+    label {
+        font-size: 13px
+    }
+
+    input[type=range] {
+        width: 120px
+    }
+
+    .canvas-wrap {
+        border-radius: 8px;
+        overflow: hidden;
+        border: 1px solid rgba(15,23,42,0.06);
+        background: var(--canvas-bg)
+    }
+
+    canvas {
+        display: block;
+        touch-action: none;
+        width: 100%;
+        height: 260px
+    }
+
+    .hint {
+        font-size: 13px;
+        color: #555;
+        margin-top: 8px
+    }
+
+    .row {
+        display: flex;
+        gap: 8px;
+        align-items: center
+    }
+</style>
+
+<div class="text-center">
+    <div class="card">
+        <h1>Signature to Image (mouse / touch)</h1>
+        <div class="toolbar">
+            <div class="row">
+                <button id="clearBtn">Clear</button>
+                <button id="undoBtn">Undo</button>
+                <button id="saveBtn" class="btn-primary">Save PNG</button>
+            </div>
+            <div class="controls">
+                <label for="sizeRange">Stroke</label>
+                <input id="sizeRange" type="range" min="1" max="12" value="2">
+                <label for="colorPicker">Color</label>
+                <input id="colorPicker" type="color" value="#000000">
+            </div>
+        </div>
+
+        <div class="canvas-wrap">
+            <canvas id="sigCanvas"></canvas>
+        </div>
+
+        <div class="hint">
+            Draw your signature inside the box above using mouse or touch.
+            Click <strong>Save PNG</strong> to download the image.
+        </div>
+        <div style="margin-top: 15px;">
+            <a href="@Url.Action("SignatureList", "Home")" class="btn-primary" style="padding: 8px 16px; text-decoration: none; color: white; border-radius: 6px;">View Signature List</a>
+        </div>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('sigCanvas');
+    const ctx = canvas.getContext('2d');
+    const clearBtn = document.getElementById('clearBtn');
+    const undoBtn = document.getElementById('undoBtn');
+    const saveBtn = document.getElementById('saveBtn');
+    const sizeRange = document.getElementById('sizeRange');
+    const colorPicker = document.getElementById('colorPicker');
+
+    let strokes = [];
+    let current = null;
+    let drawing = false;
+
+    function getPointerPos(e) {
+        const rect = canvas.getBoundingClientRect();
+        const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+        const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+        return { x, y };
+    }
+
+    function startDraw(e) {
+        e.preventDefault();
+        drawing = true;
+        current = { points: [], color: colorPicker.value, size: parseFloat(sizeRange.value) };
+        current.points.push(getPointerPos(e));
+    }
+
+    function drawMove(e) {
+        if (!drawing) return;
+        e.preventDefault();
+        current.points.push(getPointerPos(e));
+        redraw();
+    }
+
+    function endDraw() {
+        if (!drawing) return;
+        drawing = false;
+        if (current.points.length > 1) strokes.push(current);
+        current = null;
+    }
+
+    function redraw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        const drawStroke = (s) => {
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = s.color;
+            ctx.lineWidth = s.size;
+            ctx.beginPath();
+            ctx.moveTo(s.points[0].x, s.points[0].y);
+            for (let i = 1; i < s.points.length; i++) ctx.lineTo(s.points[i].x, s.points[i].y);
+            ctx.stroke();
+        };
+
+        strokes.forEach(drawStroke);
+        if (current) drawStroke(current);
+    }
+
+    function resizeCanvas() {
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = rect.width;
+        canvas.height = rect.height;
+        redraw();
+    }
+
+    clearBtn.onclick = () => { strokes = []; current = null; redraw(); };
+    undoBtn.onclick = () => { strokes.pop(); redraw(); };
+    saveBtn.onclick = () => {
+        if (!strokes || strokes.length === 0) {
+        alert("Please draw your signature before saving.");
+        return;
+    }
+
+        const exportCanvas = document.createElement('canvas');
+        exportCanvas.width = canvas.width;
+        exportCanvas.height = canvas.height;
+        const ectx = exportCanvas.getContext('2d');
+        ectx.fillStyle = '#fff';
+        ectx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+        strokes.forEach(s => {
+            ectx.lineJoin = 'round';
+            ectx.lineCap = 'round';
+            ectx.strokeStyle = s.color;
+            ectx.lineWidth = s.size;
+            ectx.beginPath();
+            ectx.moveTo(s.points[0].x, s.points[0].y);
+            for (let i = 1; i < s.points.length; i++) ectx.lineTo(s.points[i].x, s.points[i].y);
+            ectx.stroke();
+        });
+        const dataUrl = exportCanvas.toDataURL('image/png');
+        const a = document.createElement('a');
+
+        fetch('Home/SaveSignature', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ imageData: dataUrl })
+    })
+    .then(res => res.json())
+    .then(result => {
+        if (result.success) {
+            alert('Signature saved successfully!');
+            strokes = []; current = null; redraw();
+        } else {
+            alert('Error saving signature.');
+        }
+    })
+    .catch(err => console.error(err));
+    };
+
+    canvas.addEventListener('mousedown', startDraw);
+    canvas.addEventListener('mousemove', drawMove);
+    window.addEventListener('mouseup', endDraw);
+
+    canvas.addEventListener('touchstart', startDraw, { passive: false });
+    canvas.addEventListener('touchmove', drawMove, { passive: false });
+    window.addEventListener('touchend', endDraw);
+
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+</script>

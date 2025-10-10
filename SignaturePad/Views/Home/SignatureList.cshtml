@@ -1,0 +1,111 @@
+﻿<title>Signature List </title>
+<style>
+    body {
+        font-family: system-ui, sans-serif;
+        background: #f5f7fb;
+        display: flex;
+        justify-content: center;
+        padding: 40px;
+    }
+
+    .container {
+        width: 800px;
+        background: #fff;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+
+    table {
+        border-collapse: collapse;
+        width: 100%;
+    }
+
+    th, td {
+        border: 1px solid #ddd;
+        padding: 10px;
+        text-align: center;
+        cursor: pointer;
+    }
+
+    th {
+        background: #2b6cb0;
+        color: white;
+    }
+
+    tr:hover {
+        background: #f0f4ff;
+    }
+
+    #preview {
+        margin-top: 20px;
+        text-align: center;
+    }
+
+        #preview img {
+            max-width: 400px;
+            border: 2px solid #2b6cb0;
+            border-radius: 6px;
+            padding: 5px;
+        }
+</style>
+
+<div class="container">
+    <div style="margin-top: 15px;">
+        <a href="@Url.Action("Index", "Home")" class="btn-primary" style="padding: 8px 16px; text-decoration: none; color: white; border-radius: 6px;">Home</a>
+    </div>
+    <h2>Signature List </h2>
+
+    <table id="signatureTable">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Signature</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Dynamically filled -->
+        </tbody>
+    </table>
+
+    <div id="preview">
+        <h3>Selected Signature</h3>
+        <img id="previewImg" src="" alt="Select a signature" style="display:none;">
+    </div>
+</div>
+
+<script>
+    async function loadSignatures() {
+        try {
+            const response = await fetch('/Home/GetAll'); // ✅ Correct route
+            const data = await response.json();
+
+            const tbody = document.querySelector('#signatureTable tbody');
+            tbody.innerHTML = '';
+
+            data.forEach(sign => {
+                const tr = document.createElement('tr');
+                tr.setAttribute('data-sign', sign.imagePath);
+
+                tr.innerHTML = `
+                    <td>${sign.id}</td>
+                    <td><img src="${sign.imagePath}" width="100" height="40" alt="Signature"></td>
+                `;
+
+                tr.addEventListener('click', () => showPreview(sign.imagePath));
+                tbody.appendChild(tr);
+            });
+
+        } catch (error) {
+            console.error('Error loading signatures:', error);
+        }
+    }
+
+    function showPreview(imagePath) {
+        const previewImg = document.getElementById('previewImg');
+        previewImg.src = imagePath;
+        previewImg.style.display = 'block';
+    }
+
+    document.addEventListener('DOMContentLoaded', loadSignatures);
+</script>
