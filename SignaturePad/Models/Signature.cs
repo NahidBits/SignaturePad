@@ -2,7 +2,7 @@
 {
     public class Signature
     {
-        public int Id { get; set; }
-        public string ImagePath { get; set; } = string.Empty;
+        public Guid Id { get; set; } = new Guid();
+        public byte[]? ImageData { get; set; }
     }
 }

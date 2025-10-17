@@ -2,6 +2,6 @@
 {
     public class SignatureRequest
     {
-        public string ImageData { get; set; }
+        public required byte[] ImageData { get; set; }
     }
 }

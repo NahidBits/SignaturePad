@@ -77,7 +77,7 @@
 <script>
     async function loadSignatures() {
         try {
-            const response = await fetch('/Home/GetAll'); // ✅ Correct route
+            const response = await fetch('/Home/GetAll'); 
             const data = await response.json();
 
             const tbody = document.querySelector('#signatureTable tbody');
@@ -88,11 +88,15 @@
                 tr.setAttribute('data-sign', sign.imagePath);
 
                 tr.innerHTML = `
-                    <td>${sign.id}</td>
-                    <td><img src="${sign.imagePath}" width="100" height="40" alt="Signature"></td>
-                `;
+                <td>${sign.id}</td>
+                <td>
+                    ${sign.imageBase64
+                        ? `<img src="${sign.imageBase64}" width="100" height="40" alt="Signature">`
+                        : '<span>No Image</span>'}
+                </td>
+            `;
 
-                tr.addEventListener('click', () => showPreview(sign.imagePath));
+                tr.addEventListener('click', () => showPreview(sign.imageBase64));
                 tbody.appendChild(tr);
             });
 
@@ -101,10 +105,10 @@
         }
     }
 
-    function showPreview(imagePath) {
+    function showPreview(imageBase64) {
         const previewImg = document.getElementById('previewImg');
-        previewImg.src = imagePath;
-        previewImg.style.display = 'block';
+        previewImg.src = imageBase64 || '';
+        previewImg.style.display = imageBase64 ? 'block' : 'none';
     }
 
     document.addEventListener('DOMContentLoaded', loadSignatures);

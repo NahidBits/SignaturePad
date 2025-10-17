@@ -2,8 +2,9 @@
 using Microsoft.EntityFrameworkCore;
 using SignaturePad.Data;
 using SignaturePad.Models;
-using System.Diagnostics;
-using System.Text.RegularExpressions;
+using System.Reflection.Metadata;
+using iTextSharp.text;
+using iTextSharp.text.pdf;
 
 namespace SignaturePad.Controllers
 {
@@ -29,38 +30,28 @@ namespace SignaturePad.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> SaveSignature([FromBody] SignatureRequest request)
+        public async Task<IActionResult> SaveSignature(IFormFile file)
         {
             try
             {
-                if (string.IsNullOrEmpty(request.ImageData))
+                if (file == null || file.Length == 0)
                     return Json(new { success = false, message = "No image data provided" });
 
-                var base64Data = Regex.Replace(request.ImageData, "^data:image\\/png;base64,", string.Empty);
-
-                byte[] bytes = Convert.FromBase64String(base64Data);
-
-                var folderPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "Signatures");
-                if (!Directory.Exists(folderPath))
-                    Directory.CreateDirectory(folderPath);
-
-                var fileName = $"signature_{DateTime.Now:yyyyMMddHHmmssfff}.png";
-                var filePath = Path.Combine(folderPath, fileName);
-
-                await System.IO.File.WriteAllBytesAsync(filePath, bytes);
+                using var memoryStream = new MemoryStream();
+                await file.CopyToAsync(memoryStream);
+                byte[] imageBytes = memoryStream.ToArray();
 
                 var signature = new Signature
                 {
-                    ImagePath = "/Signatures/" + fileName
+                    ImageData = imageBytes
                 };
 
-                    _context.Signatures.Add(signature);
+                _context.Signatures.Add(signature);
                 await _context.SaveChangesAsync();
 
                 return Json(new
                 {
-                    success = true,
-                    path = signature.ImagePath
+                    success = true
                 });
             }
             catch (Exception ex)
@@ -73,25 +64,57 @@ namespace SignaturePad.Controllers
         public async Task<IActionResult> GetAll()
         {
             var signatures = await _context.Signatures
-                .Select(s => new
-                {
-                    s.Id,
-                    s.ImagePath
-                })
-                .ToListAsync();
+            .Select(s => new
+            {
+                s.Id,
+                ImageBase64 = s.ImageData != null
+                    ? "data:image/png;base64," + Convert.ToBase64String(s.ImageData)
+                    : null
+            })
+            .ToListAsync();
 
             return Json(signatures);
         }
-
+        public IActionResult ImageToPdf()
+        {
+            return View();
+        }
         public IActionResult Privacy()
         {
             return View();
         }
 
-        [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
-        public IActionResult Error()
+        [HttpPost]
+        [HttpPost]
+        public IActionResult ExportToPdf(IFormFile imageFile)
         {
-            return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
+            if (imageFile == null || imageFile.Length == 0)
+            {
+                ViewBag.Message = "Please upload an image first.";
+                return View("Index");
+            }
+
+            using var msImage = new MemoryStream();
+            imageFile.CopyTo(msImage);
+            msImage.Position = 0;
+
+            using var pdfStream = new MemoryStream();
+            using (var pdfDoc = new iTextSharp.text.Document(PageSize.A4, 0, 0, 0, 0))
+            {
+                PdfWriter.GetInstance(pdfDoc, pdfStream);
+                pdfDoc.Open();
+
+                var image = iTextSharp.text.Image.GetInstance(msImage.ToArray());
+                image.ScaleAbsolute(pdfDoc.PageSize.Width, pdfDoc.PageSize.Height);
+                image.SetAbsolutePosition(0, 0);
+                pdfDoc.Add(image);
+                pdfDoc.Close();
+            }
+
+            var pdfBytes = pdfStream.ToArray();
+            string pdfFileName = Path.GetFileNameWithoutExtension(imageFile.FileName) + ".pdf";
+
+            return File(pdfBytes, "application/pdf", pdfFileName);
         }
     }
 }
